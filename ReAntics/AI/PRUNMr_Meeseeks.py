@@ -44,8 +44,7 @@ class AIPlayer(Player):
         self.homes = []
         self.playerIndex = None
         self.enemyHomes = []
-        self.inputs = {'bias': 0.0,
-                       'foodCount': 0.0,
+        self.inputs = {'foodCount': 0.0,
                        'myWorkerCount': 0.0,  # This includes num of workers, if they are carrying food, and distance
                        'numSoldersDistToQueen': 0.0,
                        'enQueenHealth': 0.0,
@@ -59,11 +58,11 @@ class AIPlayer(Player):
     def initWeights(self):
         self.weights = []
         # Create list of randomized weights
-        inputCount = len(self.inputs) - 1
+        inputCount = len(self.inputs)
         for n in range(0, inputCount):
             self.weights.append([])
             for j in range(0, inputCount):
-                self.weights[n].append(random.uniform(-1.0, 1.0))
+                self.weights[n].append(round(random.uniform(-1.0, 1.0), 5))
         # TODO: Should we round these values to a number of significant digits?
         print("===== Initial Weights =====")
         print(self.weights)
@@ -142,7 +141,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        print(self.inputs)
+        self.backPropogation(self.weights, list(self.inputs.values()), 0, 0.23, currentState)
         return move
 
     ##
@@ -348,7 +347,6 @@ class AIPlayer(Player):
         sumScore = foodScore + healthScore + capturehealthScore + antScore
         return sumScore / 4.0
 
-
     ##
     # registerWin
     #
@@ -396,15 +394,15 @@ class AIPlayer(Player):
         return nextState
 
     def propagate(self, inputs, weights):
-        for i in inputs:
-            sum += inputs[i]*weights[0][i]
-        if sum > 1:
+        nodeSum = 0.0
+        for i in range(0, len(inputs) - 1):
+            nodeSum += inputs[i]*weights[0][i]
+        if nodeSum > 1:
             return 1
-        elif sum < -1:
+        elif nodeSum < -1:
             return -1
         else:
-            return sum
-
+            return nodeSum
 
     def adjustWeights (self, initWeights, errorTerm, inputs):
         for i in inputs:
@@ -412,10 +410,10 @@ class AIPlayer(Player):
         return newWeight
 
     def backPropogation(self, weights, inputs, output, g, state):
-        actualVal = self.propogate(inputs, weights)
-        expectedVal = self.scoreState(self, state, state.whoseTurn)
-        error = expectedVal-actualVal
-        while error > 0.03 | error < -0.03:
+        actualVal = self.propagate(inputs, weights)
+        expectedVal = self.scoreState(state, state.whoseTurn)
+        error = float(expectedVal-actualVal)
+        while -0.03 > error > 0.03:
             errorTerm = error*g*(1-g)
             newWeights = self.adjustWeights(self, weights, errorTerm, inputs)
             actualVal = self.propagate(self, inputs, newWeights)

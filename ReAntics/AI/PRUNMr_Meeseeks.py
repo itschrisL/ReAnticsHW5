@@ -396,7 +396,7 @@ class AIPlayer(Player):
     def propagate(self, inputs, weights):
         nodeSum = 0.0
         for i in range(0, len(inputs) - 1):
-            nodeSum += inputs[i]*weights[0][i]
+            nodeSum = nodeSum + inputs[i]*weights[i]
         if nodeSum > 1:
             return 1
         elif nodeSum < -1:
@@ -405,7 +405,7 @@ class AIPlayer(Player):
             return nodeSum
 
     def adjustWeights (self, initWeights, errorTerm, inputs):
-        for i in inputs:
+        for i in range(0, len(inputs)):
             newWeight = initWeights[0][i] - (self.alpha*errorTerm*inputs[i])
         return newWeight
 
@@ -413,11 +413,13 @@ class AIPlayer(Player):
         actualVal = self.propagate(inputs, weights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
-        while -0.03 > error > 0.03:
+        while not -0.03 > error > 0.03:
+            print("got here")
             errorTerm = error*g*(1-g)
-            newWeights = self.adjustWeights(self, weights, errorTerm, inputs)
-            actualVal = self.propagate(self, inputs, newWeights)
+            newWeights = self.adjustWeights(weights, errorTerm, inputs)
+            actualVal = self.propagate(inputs, newWeights)
             error = expectedVal - actualVal
+        print(error)
         return actualVal
 
 def testMeeseek():

@@ -13,8 +13,8 @@ from AIPlayerUtils import *
 import numpy as np
 
 ##
-# AI Homework 3
-# Authors: Chris Lytle and Simon Grannetia
+# AI Homework 5
+# Authors: Chris Lytle and Reeca Bardon
 # Date: 10/8/18
 ##
 
@@ -44,15 +44,16 @@ class AIPlayer(Player):
         self.homes = []
         self.playerIndex = None
         self.enemyHomes = []
-        self.inputs = {'bias': 0,
-                       'foodCount': 0,
-                       'myWorkerCount': 0,
-                       'numSoldersDistToQueen': 0,
-                       'enQueenHealth': 0,
-                       'enAnthillHealth': 0,
-                       'enWorkerCount': 0}
+        self.inputs = {'bias': 0.0,
+                       'foodCount': 0.0,
+                       'myWorkerCount': 0.0,  # This includes num of workers, if they are carrying food, and distance
+                       'numSoldersDistToQueen': 0.0,
+                       'enQueenHealth': 0.0,
+                       'enAnthillHealth': 0.0,
+                       'enWorkerCount': 0.0}
         self.weights = None
         self.bias = 1
+        self.alpha = 0.5
         self.states = []
 
     def initWeights(self):
@@ -66,7 +67,6 @@ class AIPlayer(Player):
         # TODO: Should we round these values to a number of significant digits?
         print("===== Initial Weights =====")
         print(self.weights)
-
 
     ##
     # getPlacement
@@ -142,7 +142,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-
+        print(self.inputs)
         return move
 
     ##
@@ -269,6 +269,7 @@ class AIPlayer(Player):
         enemyQueen = enemyInv.getQueen()
         playerFoodGross = myInv.foodCount
         foodScore = playerFoodGross / 11.0
+        self.inputs['foodCount'] = foodScore
 
         # tests for final win/lose states
         if myQueen is None:
@@ -276,9 +277,10 @@ class AIPlayer(Player):
         if enemyQueen is None:
             return 1
 
+        # TODO: Maybe delete this because enemyQueen health should never be greater then 10
         if enemyQueen.health > 10:
             antScore = antScore + (1 / enemyQueen.health)
-            # self.inputs['enQueenHealth'] = antScore
+            self.inputs['enQueenHealth'] = antScore  # Update input list
 
         if foodScore == 1.0:
             return playerFoodGross
@@ -286,10 +288,12 @@ class AIPlayer(Player):
         # checks health of enemy queen
         if enemyQueen is not None:
             healthScore = 1.0 - enemyQueen.health / 10.0
+            self.inputs['enQueenHealth'] = healthScore
         else:
             return 1.0
         # health of capture anthill
         capturehealthScore = 1.0 - self.enemyHomes[0].captureHealth / 3.0
+        self.inputs['enAnthillHealth'] = capturehealthScore
         if capturehealthScore == 1.0:
             return capturehealthScore
 
@@ -298,22 +302,28 @@ class AIPlayer(Player):
         fighters = getAntList(gameState, me, (R_SOLDIER,))
         enemyWorkers = getAntList(gameState, enemy, (WORKER,))
 
+        myWorkerCount = 0
         # Keeps one worker, and makes sure it gets food
         if len(workers) < 1:
             antScore = antScore - .2
+            myWorkerCount += .2
         for worker in workers:
             (x, y) = worker.coords
             if worker.carrying:
                 antScore = antScore + .01
-                stepsToHomes = (
-                approxDist(worker.coords, self.homes[0].coords), approxDist((x, y), self.homes[1].coords))
+                myWorkerCount += .2
+                stepsToHomes = \
+                    (approxDist(worker.coords, self.homes[0].coords), approxDist((x, y), self.homes[1].coords))
                 minSteps = min(stepsToHomes)
                 antScore = antScore + .01 / (1.0 + minSteps)
+                myWorkerCount += .01 / (1.0 + minSteps)
             else:
                 stepsToFoods = (approxDist((x, y), self.foods[0].coords), approxDist((x, y), self.foods[1].coords),
                                 approxDist((x, y), self.foods[2].coords), approxDist((x, y), self.foods[3].coords))
                 minSteps = min(stepsToFoods)
                 antScore = antScore + .01 / (1.0 + minSteps)
+                myWorkerCount += .01 / (1.0 + minSteps)
+        self.inputs['myWorkerCount'] = myWorkerCount
 
         # Only one range solider is created,
         # it first goes and kills the worker AnT and then moves towards the Anthill to kill the Queen
@@ -325,16 +335,19 @@ class AIPlayer(Player):
             if len(enemyWorkers) >= 1:
                 stepsToEnemyTunnel = approxDist((x, y), self.enemyHomes[1].coords)
                 antScore = antScore + .1 / (1.0 + stepsToEnemyTunnel)
+                self.inputs['enWorkerCount'] = .1 / (1.0 + stepsToEnemyTunnel)
 
             elif len(enemyWorkers) <= 0:
                 antScore = antScore + .1
+                self.inputs['enWorkerCount'] = .1
                 stepsToEnemyQueen = approxDist((x, y), enemyQueen.coords)
                 if stepsToEnemyQueen > 2:
                     antScore = antScore + .2 / (1.0 + stepsToEnemyQueen)
+                    self.inputs['enWorkerCount'] += .2 / (1.0 + stepsToEnemyQueen)
+
         sumScore = foodScore + healthScore + capturehealthScore + antScore
         return sumScore / 4.0
-    
-    
+
 
     ##
     # registerWin

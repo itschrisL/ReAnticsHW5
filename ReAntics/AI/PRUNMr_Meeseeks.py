@@ -397,8 +397,7 @@ class AIPlayer(Player):
 
     def propagate(self, inputs, weights):
         for i in inputs:
-            sum += inputs[i]*weights[i]
-
+            sum += inputs[i]*weights[0][i]
         if sum > 1:
             return 1
         elif sum < -1:
@@ -407,9 +406,9 @@ class AIPlayer(Player):
             return sum
 
 
-    def adjustWeights (self, initWeights, learningRate, errorTerm, inputs):
+    def adjustWeights (self, initWeights, errorTerm, inputs):
         for i in inputs:
-            newWeight = initWeights[i] - (learningRate*errorTerm*inputs[i])
+            newWeight = initWeights[0][i] - (self.alpha*errorTerm*inputs[i])
         return newWeight
 
     def backPropogation(self, weights, inputs, output, g, state):
@@ -418,7 +417,7 @@ class AIPlayer(Player):
         error = expectedVal-actualVal
         while error > 0.03 | error < -0.03:
             errorTerm = error*g*(1-g)
-            newWeights = self.adjustWeights(self, weights, learningRate, errorTerm, inputs)
+            newWeights = self.adjustWeights(self, weights, errorTerm, inputs)
             actualVal = self.propagate(self, inputs, newWeights)
             error = expectedVal - actualVal
         return actualVal

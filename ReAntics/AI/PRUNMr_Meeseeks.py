@@ -11,6 +11,7 @@ from Move import Move
 from GameState import *
 from AIPlayerUtils import *
 import numpy as np
+import math
 
 ##
 # AI Homework 5
@@ -52,7 +53,7 @@ class AIPlayer(Player):
                        'enWorkerCount': 0.0}
         self.weights = None
         self.bias = 1
-        self.alpha = 0.5
+        self.alpha = 0.1
         self.states = []
 
     def initWeights(self):
@@ -141,7 +142,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        self.backPropogation(self.weights, list(self.inputs.values()), 0, 0.23, currentState)
+        self.backPropogation(self.weights, list(self.inputs.values()), 0, currentState)
         return move
 
     ##
@@ -396,30 +397,39 @@ class AIPlayer(Player):
     def propagate(self, inputs, weights):
         nodeSum = 0.0
         for i in range(0, len(inputs) - 1):
-            nodeSum = nodeSum + inputs[i]*weights[i]
-        if nodeSum > 1:
-            return 1
-        elif nodeSum < -1:
-            return -1
-        else:
-            return nodeSum
+            nodeSum = nodeSum + float(inputs[i]*weights[0][i])
+        if math.isnan(nodeSum):
+            return 0
 
-    def adjustWeights (self, initWeights, errorTerm, inputs):
+        # if nodeSum > 1:
+        #     return 1
+        # elif nodeSum < -1:
+        #     return -1
+        # else:
+        return nodeSum
+
+    def adjustWeights (self, initWeights, inputs, error):
+        newWeight = []
+        newList = []
         for i in range(0, len(inputs)):
-            newWeight = initWeights[0][i] - (self.alpha*errorTerm*inputs[i])
+            g = 1/(1 + math.exp(-1*inputs[i]))
+            errorTerm = error*g*(1-g)
+            temp = initWeights[0][i] - (self.alpha*errorTerm*inputs[i])
+            newList.append(initWeights[0][i] - (self.alpha*errorTerm*inputs[i]))
+        newWeight.append(newList)
         return newWeight
 
-    def backPropogation(self, weights, inputs, output, g, state):
+    def backPropogation(self, weights, inputs, output, state):
         actualVal = self.propagate(inputs, weights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
         while not -0.03 > error > 0.03:
-            print("got here")
-            errorTerm = error*g*(1-g)
-            newWeights = self.adjustWeights(weights, errorTerm, inputs)
-            actualVal = self.propagate(inputs, newWeights)
+            weights = self.adjustWeights(weights, inputs, error)
+            actualVal = self.propagate(inputs, weights)
+            #print(weights)
+            #print(expectedVal)
             error = expectedVal - actualVal
-        print(error)
+        print("=========== EXIT =============================\n\n\n")
         return actualVal
 
 def testMeeseek():

@@ -315,7 +315,8 @@ class AIPlayer(Player):
                 minSteps = min(stepsToFoods)
                 antScore = antScore + .01 / (1.0 + minSteps)
 
-        # Only one range solider is created, it first goes and kills the worker AnT and then moves towards the Anthill to kill the Queen
+        # Only one range solider is created,
+        # it first goes and kills the worker AnT and then moves towards the Anthill to kill the Queen
         for fighter in fighters:
             (x, y) = fighter.coords
             if len(fighters) <= 1:
@@ -381,6 +382,33 @@ class AIPlayer(Player):
             nextState.whoseTurn = 1 - currentState.whoseTurn
         return nextState
 
+    def propagate(self, inputs, weights):
+        for i in inputs:
+            sum += inputs[i]*weights[i]
+
+        if sum > 1:
+            return 1
+        elif sum < -1:
+            return -1
+        else:
+            return sum
+
+
+    def adjustWeights (self, initWeights, learningRate, errorTerm, inputs):
+        for i in inputs:
+            newWeight = initWeights[i] - (learningRate*errorTerm*inputs[i])
+        return newWeight
+
+    def backPropogation(self, weights, inputs, output, g, state):
+        actualVal = self.propogate(inputs, weights)
+        expectedVal = self.scoreState(self, state, state.whoseTurn)
+        error = expectedVal-actualVal
+        while error > 0.03 | error < -0.03:
+            errorTerm = error*g*(1-g)
+            newWeights = self.adjustWeights(self, weights, learningRate, errorTerm, inputs)
+            actualVal = self.propagate(self, inputs, newWeights)
+            error = expectedVal - actualVal
+        return actualVal
 
 def testMeeseek():
     gameState = GameState.getBasicState()
@@ -391,6 +419,8 @@ def testMeeseek():
         print('You have an error in your scoreState, not recording 11 food as victory')
     else:
         print("passed unit test")
+
+
 
 
 testMeeseek()

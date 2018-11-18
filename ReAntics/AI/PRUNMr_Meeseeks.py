@@ -53,7 +53,9 @@ class AIPlayer(Player):
                        'enWorkerCount': 0.0}
         self.inputWeights = None  # Weights from the inputs to each hidden layer node
         self.hiddenNodeWeights = None  # Weights from the hidden layer to the output layer
+        self.biasWeights = None
         self.bias = 1
+        self.weightOnOutputBias = 0.0
         self.alpha = 0.1
         self.numOfHiddenNodes = 4
         self.states = []
@@ -71,6 +73,9 @@ class AIPlayer(Player):
         self.hiddenNodeWeights = []
         for n in range(0, self.numOfHiddenNodes):
             self.hiddenNodeWeights.append(round(random.uniform(-1.0, 1.0), 5))
+            self.biasWeights.append(round(random.uniform(-1.0, 1.0), 5))
+
+        self.weightOnOutputBias = round(random.uniform(-1.0, 1.0), 5)
 
 
         # TODO: Should we round these values to a number of significant digits?
@@ -409,7 +414,7 @@ class AIPlayer(Player):
     def propagate(self, inputs, weights):
         nodeSum = 0.0
         for i in range(0, len(inputs) - 1):
-            nodeSum = nodeSum + float(inputs[i]*weights[0][i])
+            nodeSum = nodeSum + float(inputs[i]*weights[i][0])
         if math.isnan(nodeSum):
             return 0
 
@@ -420,16 +425,36 @@ class AIPlayer(Player):
         # else:
         return nodeSum
 
-    def adjustWeights (self, initWeights, inputs, error):
-        newWeight = []
-        newList = []
+    def propagate2(self, inputs, weights, hiddenWeights):
+        hiddenNodeValues = []
+
+        # Calculate value for hidden layer
         for i in range(0, len(inputs)):
+            sum = 0
+            for j in range(0, self.numOfHiddenNodes):
+                sum += weights[i][j] * inputs[j]
+            sum += bias * self.biasWeights[i]
+            g = 1/(1+math.exp(-1*sum))
+            val = g*(1 - g)
+            hiddenNodeValues.append(val)
+
+        for i in range(0, self.numOfHiddenNodes):
+            sum = 0
+            for j in range(0, self.numOfHiddenNodes):
+                sum += hiddenWeights[j] * hiddenNodeValues[i]
+
+
+
+
+    def adjustWeights(self, initWeights, inputs, error):
+        newWeights = []
+        for i in range(0, len(inputs)):
+            list = []
             g = 1/(1 + math.exp(-1*inputs[i]))
-            errorTerm = error*g*(1-g)
-            temp = initWeights[0][i] - (self.alpha*errorTerm*inputs[i])
-            newList.append(initWeights[0][i] - (self.alpha*errorTerm*inputs[i]))
-        newWeight.append(newList)
-        return newWeight
+            errorTerm = error * g * (1 - g)
+            list.append(initWeights[i][0] - (self.alpha * errorTerm * inputs[i]))
+            newWeights.append(list)
+        return newWeights
 
     def backPropogation(self, state):
         # Get all the inputs and weight values
@@ -442,6 +467,7 @@ class AIPlayer(Player):
             weights = self.adjustWeights(weights, inputs, error)
             actualVal = self.propagate(inputs, weights)
             error = expectedVal - actualVal
+        print("================EXIT================")
         return actualVal
 
 def testMeeseek():
@@ -458,3 +484,10 @@ def testMeeseek():
 
 
 testMeeseek()
+
+class testMethods(UnitTest.TestCase):
+
+    def test_propagate2(self):
+
+        pass
+

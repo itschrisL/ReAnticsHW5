@@ -51,22 +51,34 @@ class AIPlayer(Player):
                        'enQueenHealth': 0.0,
                        'enAnthillHealth': 0.0,
                        'enWorkerCount': 0.0}
-        self.weights = None
+        self.inputWeights = None  # Weights from the inputs to each hidden layer node
+        self.hiddenNodeWeights = None  # Weights from the hidden layer to the output layer
         self.bias = 1
         self.alpha = 0.1
+        self.numOfHiddenNodes = 4
         self.states = []
 
     def initWeights(self):
-        self.weights = []
+        self.inputWeights = []
         # Create list of randomized weights
         inputCount = len(self.inputs)
         for n in range(0, inputCount):
-            self.weights.append([])
-            for j in range(0, inputCount):
-                self.weights[n].append(round(random.uniform(-1.0, 1.0), 5))
+            self.inputWeights.append([])
+            for j in range(0, self.numOfHiddenNodes):
+                self.inputWeights[n].append(round(random.uniform(-1.0, 1.0), 5))
+
+        # Create hidden node weights
+        self.hiddenNodeWeights = []
+        for n in range(0, self.numOfHiddenNodes):
+            self.hiddenNodeWeights.append(round(random.uniform(-1.0, 1.0), 5))
+
+
         # TODO: Should we round these values to a number of significant digits?
         print("===== Initial Weights =====")
-        print(self.weights)
+        print("input weights")
+        print(self.inputWeights)
+        print("hidden layer weights")
+        print(self.hiddenNodeWeights)
 
     ##
     # getPlacement
@@ -84,7 +96,7 @@ class AIPlayer(Player):
     ##
     def getPlacement(self, currentState):
         # If weights haven't been set, create it with random values
-        if self.weights is None:
+        if self.inputWeights is None:
             self.initWeights()
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:  # stuff on my side
@@ -142,7 +154,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        self.backPropogation(self.weights, list(self.inputs.values()), 0, currentState)
+        self.backPropogation(currentState)
         return move
 
     ##
@@ -376,7 +388,7 @@ class AIPlayer(Player):
     # Return: A clone of what the state would look like if the move was made
     ##
     def getNextStateAdversarial(self, currentState, move):
-        # variables I will need
+        # variables I will needl
         nextState = getNextState(currentState, move)
         myInv = getCurrPlayerInventory(nextState)
         myAnts = myInv.ants
@@ -419,17 +431,17 @@ class AIPlayer(Player):
         newWeight.append(newList)
         return newWeight
 
-    def backPropogation(self, weights, inputs, output, state):
+    def backPropogation(self, state):
+        # Get all the inputs and weight values
+        weights = self.inputWeights
+        inputs = list(self.inputs.values())
         actualVal = self.propagate(inputs, weights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
         while not -0.03 > error > 0.03:
             weights = self.adjustWeights(weights, inputs, error)
             actualVal = self.propagate(inputs, weights)
-            #print(weights)
-            #print(expectedVal)
             error = expectedVal - actualVal
-        print("=========== EXIT =============================\n\n\n")
         return actualVal
 
 def testMeeseek():

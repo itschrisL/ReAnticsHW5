@@ -69,12 +69,14 @@ class AIPlayer(Player):
             for j in range(0, self.numOfHiddenNodes):
                 self.inputWeights[n].append(round(random.uniform(-1.0, 1.0), 5))
 
-        # Create hidden node weights
+        # Create hidden node weights and biasWeights
         self.hiddenNodeWeights = []
+        self.biasWeights = []
         for n in range(0, self.numOfHiddenNodes):
             self.hiddenNodeWeights.append(round(random.uniform(-1.0, 1.0), 5))
             self.biasWeights.append(round(random.uniform(-1.0, 1.0), 5))
 
+        print(self.biasWeights)
         self.weightOnOutputBias = round(random.uniform(-1.0, 1.0), 5)
 
 
@@ -159,6 +161,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
+        print(self.inputs)
         self.backPropogation(currentState)
         return move
 
@@ -411,6 +414,7 @@ class AIPlayer(Player):
             nextState.whoseTurn = 1 - currentState.whoseTurn
         return nextState
 
+    '''
     def propagate(self, inputs, weights):
         nodeSum = 0.0
         for i in range(0, len(inputs) - 1):
@@ -424,24 +428,34 @@ class AIPlayer(Player):
         #     return -1
         # else:
         return nodeSum
+    
+    '''
 
-    def propagate2(self, inputs, weights, hiddenWeights):
+    def propagate2(self, inputs, weights, hiddenWeights, biasWeights):
         hiddenNodeValues = []
-
+        bias = 1
         # Calculate value for hidden layer
-        for i in range(0, len(inputs)):
-            sum = 0
-            for j in range(0, self.numOfHiddenNodes):
-                sum += weights[i][j] * inputs[j]
-            sum += bias * self.biasWeights[i]
+        for i in range(0, self.numOfHiddenNodes):
+            sum = 0.0
+            for j in range(0, len(inputs)):
+                sum += weights[j][i] * inputs[j]
+            sum += bias * biasWeights[i]
+            if math.isnan(sum):
+                sum = 0.0
             g = 1/(1+math.exp(-1*sum))
             val = g*(1 - g)
             hiddenNodeValues.append(val)
 
-        for i in range(0, self.numOfHiddenNodes):
-            sum = 0
-            for j in range(0, self.numOfHiddenNodes):
-                sum += hiddenWeights[j] * hiddenNodeValues[i]
+        sum = 0.0
+        for j in range(0, self.numOfHiddenNodes):
+            sum += hiddenWeights[j] * hiddenNodeValues[j]
+        sum += bias * self.weightOnOutputBias
+        if math.isnan(sum):
+            sum = 0.0
+        g = 1 / (1 + math.exp(-1 * sum))
+        val = g * (1 - g)
+
+        return val
 
 
 
@@ -480,14 +494,51 @@ def testMeeseek():
     else:
         print("passed unit test")
 
-
+def test_propagate2(self):
+    bias = 1
+    biaswWightOnLastNode = 0.1
+    test = self.propagate2(self.getInputs(), self.getInputs(),
+                               self.getHiddenLayerWeights())
+    pass
 
 
 testMeeseek()
 
-class testMethods(UnitTest.TestCase):
+import unittest
+class testMethods(unittest.TestCase):
+
+    def getInputWeights(self):
+        weights = [[-0.6, 0.8, 0.5, 0.5],
+                   [-0.1, -0.2, -0.6, -0.1],
+                   [-0.9, 0.2, 0.3, -0.5],
+                   [-0.9, 0.5, -0.3, 0.4],
+                   [0.4, 0.3, -0.3, 0.2],
+                   [-0.1, -0.7, 0.8, 0.8]]
+        return weights
+
+    def getInputs(self):
+        input = [0.09, 0.01, 0.0, 0.0, 0.3, 0.0]
+        return input
+
+    def getHiddenLayerWeights(self):
+        hiddenLayerWeights = [0.2, -0.6, 0.8, 0.9]
+        return hiddenLayerWeights
+
+    def getBiasOnHiddenLayer(self):
+        list = [0.7, 0.9, -0.8, 0.1]
+
+        return list
 
     def test_propagate2(self):
-
+        gameState = GameState.getBasicState()
+        gameState.inventories[0].foodCount = 11
+        AI = AIPlayer(PLAYER_ONE)
+        bias = 1
+        biaswWightOnLastNode = 0.1
+        test = AIPlayer.propagate2(AI, self.getInputs(), self.getInputWeights(),
+                                   self.getHiddenLayerWeights(), self.getBiasOnHiddenLayer())
+        print(test)
         pass
 
+if __name__ == '__name__':
+    unittest.main()

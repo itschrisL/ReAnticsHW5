@@ -464,8 +464,9 @@ class AIPlayer(Player):
             sum += bias * biasWeights[i]
             if math.isnan(sum):
                 sum = 0.0
-            self.xInput[i] = sum
+
             g = 1/(1+math.exp(-1*sum))
+            self.xInput[i] = g
             hiddenNodeValues.append(g)
 
         sum = 0.0
@@ -479,29 +480,37 @@ class AIPlayer(Player):
 
         return g
 
-    def adjustWeights(self, weights, error):
+    def adjustWeights(self, weights, error, inputs):
+        deltas = []
+
+        for n in range(0, len(self.hiddenNodeWeights)):
+            deltas.append(error*self.hiddenNodeWeights[n])
+
+        #print(deltas)
+
         # Adjust input weights
         for r in range(0, len(weights)):
             list = []
             for c in range(0, len(weights[0])):
                 g = 1/(1 + math.exp(-1*self.xInput[c]))
                 errorTerm = error * g * (1 - g)
-                self.inputWeights[r][c] = weights[r][c] - (self.alpha * errorTerm * self.xInput[c])
-                list.append(weights[r][c] - (self.alpha * errorTerm * self.xInput[c]))
+                self.inputWeights[r][c] = weights[r][c] + (self.alpha * deltas[c] * inputs[r])
+                # list.append(weights[r][c] - (self.alpha * errorTerm * self.xInput[c]))
+        #print(self.inputWeights)
 
         for n in range(0, self.numOfHiddenNodes):
             g = 1 / (1 + math.exp(-1 * self.xInput[n]))
             errorTerm = error * g * (1 - g)
-            self.biasWeights[n] = self.biasWeights[n] - (self.alpha * errorTerm * self.xInput[n])
+            self.biasWeights[n] = self.biasWeights[n] + (self.alpha * deltas[n] * self.bias)
 
         for n in range(0, self.numOfHiddenNodes):
             g = 1 / (1 + math.exp(-1 * self.finalNodeValue))
             errorTerm = error * g * (1 - g)
-            self.hiddenNodeWeights[n] = self.hiddenNodeWeights[n] - (self.alpha * errorTerm * self.finalNodeValue)
+            self.hiddenNodeWeights[n] = self.hiddenNodeWeights[n] + (self.alpha * error * self.xInput[n])
 
         g = 1 / (1 + math.exp(-1 * self.finalNodeValue))
         errorTerm = error * g * (1 - g)
-        self.weightOnOutputBias = self.weightOnOutputBias - (self.alpha * errorTerm * self.finalNodeValue)
+        self.weightOnOutputBias = self.weightOnOutputBias + (self.alpha * error * self.bias)
 
     def backPropogation(self, state):
         # Get all the inputs and weight values
@@ -512,10 +521,11 @@ class AIPlayer(Player):
         actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
+        #self.adjustWeights(weights, error, inputs)
         #weights = self.adjustWeights(weights, error)
         while not -0.03 > error > 0.03:
-            self.adjustWeights(weights, error)
-            actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
+            self.adjustWeights(weights, error, inputs)
+            actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights)
             error = expectedVal - actualVal
             print(error)
         print("================EXIT================")
@@ -536,6 +546,7 @@ def test_propagate2(self):
     biaswWightOnLastNode = 0.1
     test = self.propagate2(self.getInputs(), self.getInputs(),
                                self.getHiddenLayerWeights())
+    print(test)
 
     if test == 3.49:
         print("propagate works")
@@ -580,8 +591,10 @@ class testMethods(unittest.TestCase):
         AI = AIPlayer(PLAYER_ONE)
         bias = 1
         biaswWightOnLastNode = 0.1
+        AI.xInput = [0, 0, 0, 0, 0, 0]
         test = AIPlayer.propagate(AI, self.getInputs(), self.getInputWeights(),
                                    self.getHiddenLayerWeights(), self.getBiasOnHiddenLayer())
+        AIPlayer.adjustWeights(AI, self.getInputWeights(), .5)
         print(test)
         pass
 

@@ -70,6 +70,7 @@ class AIPlayer(Player):
         self.alpha = 0.1
         self.numOfHiddenNodes = 4
         self.states = []
+        self.xInput = []
 
     ##
     # initWeights
@@ -94,6 +95,7 @@ class AIPlayer(Player):
         for n in range(0, self.numOfHiddenNodes):
             self.hiddenNodeWeights.append(round(random.uniform(-1.0, 1.0), 5))
             self.biasWeights.append(round(random.uniform(-1.0, 1.0), 5))
+            self.xInput.append(0)
 
         print(self.biasWeights)
         self.weightOnOutputBias = round(random.uniform(-1.0, 1.0), 5)
@@ -464,7 +466,7 @@ class AIPlayer(Player):
             g = 1/(1+math.exp(-1*sum))
             val = g*(1 - g)
             hiddenNodeValues.append(val)
-
+        self.xInput = hiddenWeights
         sum = 0.0
         for j in range(0, self.numOfHiddenNodes):
             sum += hiddenWeights[j] * hiddenNodeValues[j]
@@ -476,18 +478,14 @@ class AIPlayer(Player):
 
         return val
 
-    def adjustWeights(self, weights, inputs, error):
+    def adjustWeights(self, weights, error):
         newWeights = []
-        print(weights)
-
         for r in range(0, len(weights)):
             list = []
             for c in range(0, len(weights[0])):
-                list = []
-                g = 1/(1 + math.exp(-1*inputs[r]))
+                g = 1/(1 + math.exp(-1*self.xInput[c]))
                 errorTerm = error * g * (1 - g)
-                list.append(weights[r][c] - (self.alpha * errorTerm * inputs[r]))
-                weights[r][c] = weights[r][c] - (self.alpha * errorTerm * inputs[r])
+                list.append(weights[r][c] - (self.alpha * errorTerm * self.xInput[c]))
             newWeights.append(list)
         return newWeights
 
@@ -500,10 +498,12 @@ class AIPlayer(Player):
         actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
+        #weights = self.adjustWeights(weights, error)
         while not -0.03 > error > 0.03:
-            weights = self.adjustWeights(weights, inputs, error)
-            #actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
+            weights = self.adjustWeights(weights, error)
+            actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
             error = expectedVal - actualVal
+            print(error)
         print("================EXIT================")
         return actualVal
 

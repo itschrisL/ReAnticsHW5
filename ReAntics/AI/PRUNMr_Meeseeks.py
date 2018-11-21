@@ -72,6 +72,9 @@ class AIPlayer(Player):
         self.states = []
         self.xInput = []
         self.finalNodeValue = 0
+        self.averageError = 0  # Average error for the first pass
+        self.correctCount = 0
+        self.moves = 0
 
     ##
     # initWeights
@@ -98,16 +101,7 @@ class AIPlayer(Player):
             self.biasWeights.append(round(random.uniform(-1.0, 1.0), 5))
             self.xInput.append(0)
 
-        print(self.biasWeights)
         self.weightOnOutputBias = round(random.uniform(-1.0, 1.0), 5)
-
-
-        # TODO: Should we round these values to a number of significant digits?
-        print("===== Initial Weights =====")
-        print("input weights")
-        print(self.inputWeights)
-        print("hidden layer weights")
-        print(self.hiddenNodeWeights)
 
     ##
     # getPlacement
@@ -176,6 +170,7 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         # set global variable playerIndex
+        self.moves += 1  # add to move counter
         cpy_state = currentState.fastclone()
         self.playerIndex = cpy_state.whoseTurn
         self.foods = getConstrList(currentState, None, (FOOD,))
@@ -183,7 +178,7 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        print(self.inputs)
+        temp = list(self.inputs.values())
         self.backPropogation(currentState)
         return move
 
@@ -325,7 +320,7 @@ class AIPlayer(Player):
             self.inputs['enQueenHealth'] = antScore  # Update input list
 
         if foodScore == 1.0:
-            return playerFoodGross
+            return 1
 
         # checks health of enemy queen
         if enemyQueen is not None:
@@ -347,17 +342,17 @@ class AIPlayer(Player):
         myWorkerCount = 0
         # Keeps one worker, and makes sure it gets food
         if len(workers) < 1:
-            antScore = antScore - .2
-            myWorkerCount += .2
+            #antScore = antScore - .2
+            myWorkerCount -= .2
         for worker in workers:
             (x, y) = worker.coords
             if worker.carrying:
-                antScore = antScore + .01
-                myWorkerCount += .2
+                #antScore = antScore + .01
+                myWorkerCount += .01
                 stepsToHomes = \
                     (approxDist(worker.coords, self.homes[0].coords), approxDist((x, y), self.homes[1].coords))
                 minSteps = min(stepsToHomes)
-                antScore = antScore + .01 / (1.0 + minSteps)
+                # antScore = antScore + .01 / (1.0 + minSteps)
                 myWorkerCount += .01 / (1.0 + minSteps)
             else:
                 stepsToFoods = (approxDist((x, y), self.foods[0].coords), approxDist((x, y), self.foods[1].coords),
@@ -374,6 +369,7 @@ class AIPlayer(Player):
             if len(fighters) <= 1:
                 antScore = antScore + (.2 * len(fighters))
                 antScore = antScore + .1 * fighter.health
+                self.inputs['numSoldersDistToQueen'] = antScore
             if len(enemyWorkers) >= 1:
                 stepsToEnemyTunnel = approxDist((x, y), self.enemyHomes[1].coords)
                 antScore = antScore + .1 / (1.0 + stepsToEnemyTunnel)
@@ -387,7 +383,7 @@ class AIPlayer(Player):
                     antScore = antScore + .2 / (1.0 + stepsToEnemyQueen)
                     self.inputs['enWorkerCount'] += .2 / (1.0 + stepsToEnemyQueen)
 
-        sumScore = foodScore + healthScore + capturehealthScore + antScore
+        sumScore = foodScore + healthScore + capturehealthScore + myWorkerCount + antScore
         return sumScore / 4.0
 
     ##
@@ -396,6 +392,8 @@ class AIPlayer(Player):
     # This agent doens't learn
     #
     def registerWin(self, hasWon):
+        correctPercentage = self.correctCount/self.moves
+        print("Correct percentage per game: " + str(correctPercentage))
         # method templaste, not implemented
         pass
 
@@ -436,23 +434,9 @@ class AIPlayer(Player):
             nextState.whoseTurn = 1 - currentState.whoseTurn
         return nextState
 
-    '''
-    def propagate(self, inputs, weights):
-        nodeSum = 0.0
-        for i in range(0, len(inputs) - 1):
-            nodeSum = nodeSum + float(inputs[i]*weights[i][0])
-        if math.isnan(nodeSum):
-            return 0
-
-        # if nodeSum > 1:
-        #     return 1
-        # elif nodeSum < -1:
-        #     return -1
-        # else:
-        return nodeSum
-    
-    '''
-
+    ##
+    #
+    #
     def propagate(self, inputs, weights, hiddenWeights, biasWeights):
         hiddenNodeValues = []
         bias = 1
@@ -477,41 +461,33 @@ class AIPlayer(Player):
             sum = 0.0
         self.finalNodeValue = sum
         g = 1 / (1 + math.exp(-1 * sum))
-
         return g
 
+    #
+    #
+    #
     def adjustWeights(self, weights, error, inputs):
         deltas = []
 
         for n in range(0, len(self.hiddenNodeWeights)):
             deltas.append(error*self.hiddenNodeWeights[n])
 
-        #print(deltas)
-
         # Adjust input weights
         for r in range(0, len(weights)):
-            list = []
             for c in range(0, len(weights[0])):
-                g = 1/(1 + math.exp(-1*self.xInput[c]))
-                errorTerm = error * g * (1 - g)
                 self.inputWeights[r][c] = weights[r][c] + (self.alpha * deltas[c] * inputs[r])
-                # list.append(weights[r][c] - (self.alpha * errorTerm * self.xInput[c]))
-        #print(self.inputWeights)
 
         for n in range(0, self.numOfHiddenNodes):
-            g = 1 / (1 + math.exp(-1 * self.xInput[n]))
-            errorTerm = error * g * (1 - g)
             self.biasWeights[n] = self.biasWeights[n] + (self.alpha * deltas[n] * self.bias)
 
         for n in range(0, self.numOfHiddenNodes):
-            g = 1 / (1 + math.exp(-1 * self.finalNodeValue))
-            errorTerm = error * g * (1 - g)
             self.hiddenNodeWeights[n] = self.hiddenNodeWeights[n] + (self.alpha * error * self.xInput[n])
 
-        g = 1 / (1 + math.exp(-1 * self.finalNodeValue))
-        errorTerm = error * g * (1 - g)
         self.weightOnOutputBias = self.weightOnOutputBias + (self.alpha * error * self.bias)
 
+    ##
+    #
+    #
     def backPropogation(self, state):
         # Get all the inputs and weight values
         weights = self.inputWeights
@@ -521,25 +497,14 @@ class AIPlayer(Player):
         actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
         expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
-        #self.adjustWeights(weights, error, inputs)
-        #weights = self.adjustWeights(weights, error)
-        while not -0.03 > error > 0.03:
-            self.adjustWeights(weights, error, inputs)
+        if -0.03 < error < 0.03:
+            self.correctCount += 1
+        while -0.03 > error or error > 0.03:
+            self.adjustWeights(self.inputWeights, error, inputs)
             actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights)
             error = expectedVal - actualVal
-            print(error)
-        print("================EXIT================")
         return actualVal
 
-def testMeeseek():
-    gameState = GameState.getBasicState()
-    gameState.inventories[0].foodCount = 11
-    AI = AIPlayer(PLAYER_ONE)
-    winstate = AI.scoreState(gameState, 0)
-    if winstate != 1:
-        print('You have an error in your scoreState, not recording 11 food as victory')
-    else:
-        print("passed unit test")
 
 def test_propagate2(self):
     bias = 1
@@ -558,7 +523,7 @@ def test_adjustWeightS(self):
     pass
 
 
-testMeeseek()
+
 
 import unittest
 class testMethods(unittest.TestCase):

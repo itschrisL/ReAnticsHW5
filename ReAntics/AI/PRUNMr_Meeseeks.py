@@ -342,48 +342,57 @@ class AIPlayer(Player):
         myWorkerCount = 0
         # Keeps one worker, and makes sure it gets food
         if len(workers) < 1:
-            #antScore = antScore - .2
             myWorkerCount -= .2
         for worker in workers:
             (x, y) = worker.coords
             if worker.carrying:
-                #antScore = antScore + .01
                 myWorkerCount += .01
                 stepsToHomes = \
                     (approxDist(worker.coords, self.homes[0].coords), approxDist((x, y), self.homes[1].coords))
                 minSteps = min(stepsToHomes)
-                # antScore = antScore + .01 / (1.0 + minSteps)
                 myWorkerCount += .01 / (1.0 + minSteps)
             else:
                 stepsToFoods = (approxDist((x, y), self.foods[0].coords), approxDist((x, y), self.foods[1].coords),
                                 approxDist((x, y), self.foods[2].coords), approxDist((x, y), self.foods[3].coords))
                 minSteps = min(stepsToFoods)
-                antScore = antScore + .01 / (1.0 + minSteps)
+                # antScore = antScore + .01 / (1.0 + minSteps)
                 myWorkerCount += .01 / (1.0 + minSteps)
         self.inputs['myWorkerCount'] = myWorkerCount
 
+        soldersToQueen = 0.0
+        enWorkerCount = 0.0
         # Only one range solider is created,
         # it first goes and kills the worker AnT and then moves towards the Anthill to kill the Queen
         for fighter in fighters:
             (x, y) = fighter.coords
             if len(fighters) <= 1:
-                antScore = antScore + (.2 * len(fighters))
-                antScore = antScore + .1 * fighter.health
-                self.inputs['numSoldersDistToQueen'] = antScore
+                soldersToQueen = soldersToQueen + (.2 * len(fighters))
+                soldersToQueen = soldersToQueen + .1 * fighter.health
             if len(enemyWorkers) >= 1:
                 stepsToEnemyTunnel = approxDist((x, y), self.enemyHomes[1].coords)
-                antScore = antScore + .1 / (1.0 + stepsToEnemyTunnel)
-                self.inputs['enWorkerCount'] = .1 / (1.0 + stepsToEnemyTunnel)
-
+                # antScore = antScore + .1 / (1.0 + stepsToEnemyTunnel)
+                enWorkerCount = enWorkerCount + .1 / (1.0 + stepsToEnemyTunnel)
+                # self.inputs['enWorkerCount'] = .1 / (1.0 + stepsToEnemyTunnel)
             elif len(enemyWorkers) <= 0:
-                antScore = antScore + .1
+                enWorkerCount = enWorkerCount + .1
+                # antScore = antScore + .1
                 self.inputs['enWorkerCount'] = .1
                 stepsToEnemyQueen = approxDist((x, y), enemyQueen.coords)
                 if stepsToEnemyQueen > 2:
-                    antScore = antScore + .2 / (1.0 + stepsToEnemyQueen)
-                    self.inputs['enWorkerCount'] += .2 / (1.0 + stepsToEnemyQueen)
+                    soldersToQueen = soldersToQueen + .2 / (1.0 + stepsToEnemyQueen)
 
-        sumScore = foodScore + healthScore + capturehealthScore + myWorkerCount + antScore
+        self.inputs['foodCount'] = foodScore / 4
+        self.inputs['myWorkerCount'] = myWorkerCount / 4
+        self.inputs['numSoldersDistToQueen'] = soldersToQueen / 4
+        self.inputs['enQueenHealth'] = healthScore / 4
+        self.inputs['enAnthillHealth'] = capturehealthScore / 4
+        self.inputs['enWorkerCount'] = enWorkerCount / 4
+        sumScore = foodScore + healthScore + capturehealthScore + myWorkerCount + soldersToQueen + enWorkerCount
+
+        if (sumScore / 4) > 1:
+            print("=============Score over 1==================")
+            print("input sum = " + str(imputSum))
+            print("expected value = " + str(sumScore))
         return sumScore / 4.0
 
     ##
@@ -416,7 +425,7 @@ class AIPlayer(Player):
     # Return: A clone of what the state would look like if the move was made
     ##
     def getNextStateAdversarial(self, currentState, move):
-        # variables I will needl
+        # variables I will need
         nextState = getNextState(currentState, move)
         myInv = getCurrPlayerInventory(nextState)
         myAnts = myInv.ants
@@ -503,6 +512,8 @@ class AIPlayer(Player):
             self.adjustWeights(self.inputWeights, error, inputs)
             actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights)
             error = expectedVal - actualVal
+        #file = open("weights.txt", "w")
+        #file.write(str(weights))
         return actualVal
 
 

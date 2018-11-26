@@ -184,8 +184,9 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        self.backPropogation(currentState)
+        # self.backPropogation(currentState)
         self.prevStates.append(currentState)
+        print(str(move))
         return move
 
     ##
@@ -211,8 +212,8 @@ class AIPlayer(Player):
     #   me - reference to who's turn it is
     ##
     def startBestMoveSearch(self, state, me):
-        #currScore = self.scoreState(state, me)  # Get current score of state
-        currScore = self.scoreStateFromNet(state)
+        # currScore = self.scoreState(state, me)  # Get current score of state
+        currScore = self.scoreStateFromNet(state, me)
         moves = listAllLegalMoves(state)  #
         thisNode = {"move": None, "state": state, "score": None, "parentNode": None,
                      "alpha": -1000, "beta": 1000}  # Create node by creating dictionary
@@ -249,7 +250,8 @@ class AIPlayer(Player):
                     "alpha": alpha, "beta": beta}
         # If depth limit reach, then just return this node
         if depth == self.depthLimit:
-            thisNode["score"] = self.scoreStateFromNet(state)
+            # thisNode["score"] = self.scoreState(state, me)
+            thisNode["score"] = self.scoreStateFromNet(state, me)
             return thisNode
         else:
             moves = listAllLegalMoves(state)  # Get all legal moves
@@ -264,7 +266,8 @@ class AIPlayer(Player):
             # If at depth limit, sort nodes from lowest to highest.
             # Increase efficiency in our alpha beta pruning
             if depth == self.depthLimit - 1:
-                stateScores = [self.scoreStateFromNet(state) for state in nextStates]
+                # stateScores = [self.scoreState(state, me) for state in nextStates]
+                stateScores = [self.scoreStateFromNet(state, me) for state in nextStates]
                 lowToHighIndices = sorted(range(len(stateScores)), key=lambda k: stateScores[k])
             else:
                 # If depth limit not reached then just go through every node
@@ -295,33 +298,34 @@ class AIPlayer(Player):
                 thisNode["beta"] = beta
                 return thisNode
 
-    def scoreStateFromNet(self, state):
-        inputWieghts = [[-4.049110751128535, -2.9491082213518247, 0.6806065238560401, 0.5773638545322063,
-                         0.9063080451834983, 2.865641797356869],
-                        [-0.3864259956659805, -0.37032876419752375, -0.14394159749843088, 0.7477532690923326,
-                         -0.19935965848124151, 0.5573348346940795],
-                        [-4.662727034951296, -5.011860948665886, 0.49556593083172357, 0.0707317783013398,
-                         0.5562012107062175, 3.246180681377029],
-                        [-5.761076646738083, -3.8770757828720788, 0.6800425742572785, -0.4800177052305451,
-                         1.7207813364095417, 2.346207801181397],
-                        [-0.5691931202212036, -0.7493124708732851, -0.6799319349279332, 0.6583542435785669,
-                         0.14689671831648227, -0.0159533130967858],
-                        [-0.8836113944086057, -0.8024766580602715, 0.8871727252464776, -0.8102458217080186,
-                         -0.11622274490555982, 0.5725826289473327]]
+    def scoreStateFromNet(self, state, me):
+        inputWieghts = [[-3.657254638284446, 0.5316707141038243, -3.37440586851363, 3.481189161618746,
+                         1.911812225361641, -0.7617141134979972],
+                        [-0.1419948628500165, 0.5408133459573163, 0.30732462218556644, 0.6282180369685747,
+                         -0.623221808237557, -0.40542541575131275],
+                        [-2.9039221700126734, 2.3214477309727974, -4.1229483511642515, 4.385355885614808,
+                         1.446467997275358, -0.6178269904201446],
+                        [-3.002540165264651, 0.8274066531995593, -4.120012418654349, 3.0265894891576015,
+                         2.591871112775095, -1.290227630952384],
+                        [-0.7081027248689823, 0.4358020709106849, -0.7160712298391342, -0.30748940964166055,
+                         0.6340418446947687, -0.11067959251406172],
+                        [0.2677833319025874, -0.4643719898011794, -0.9562896052878249, 0.7597785803211642,
+                         -0.1527834612583077, -0.36381517207034897]]
 
-        hiddenNodeWieghts = [-3.1939257575811384, -2.629935916387678, 0.47054739998785783, 0.0014479968710898738,
-                             0.7442333989951628, 2.0246821143399782]
+        hiddenNodeWieghts = [-1.9081998289314128, 0.9584860148444749, -2.849651219982444, 2.2680280743882144,
+                             1.188555169512328, -0.6569314486414466]
 
-        biasWeights = [-0.5741574426544654, -0.7568596504794267, -0.44704321913517825, -1.3886490770572109,
-                       -0.9651993802022091, -1.3847097571614273]
+        biasWeights = [-1.1252804099405211, -0.8905612507341796, -0.3507730897105387, -1.908624837158301,
+                       -1.4219125700687236, -1.1401836142819237]
 
-        biasWeightOnOutput = -0.9657786836202035
 
-        temp = self.scoreState(state, state.whoseTurn)
+        biasWeightOnOutput = -0.982014739415461
+
+        temp = self.scoreState(state, me)
         inputList = list(self.inputs.values())
         val = self.propagate(inputList, inputWieghts, hiddenNodeWieghts, biasWeights, biasWeightOnOutput)
-        #print("ours: " + str(val))
-        #print("expect: " + str(temp))
+        # print("ours: " + str(val))
+        # print("expect: " + str(temp))
         return val
 
     ##
@@ -437,14 +441,14 @@ class AIPlayer(Player):
     # This agent doens't learn
     #
     def registerWin(self, hasWon):
-        print(self.correctCount)
-        print(self.moves)
-        correctPercentage = self.correctCount/self.moves
-        print("Correct percentage per game: " + str(correctPercentage))
-
         random.shuffle(self.prevStates)
         for state in self.prevStates:
-            self.backPropogation(state)
+            self.backPropogation(state, self.playerIndex)
+
+        print(self.correctCount)
+        print(self.moves)
+        correctPercentage = self.correctCount / self.moves
+        print("Correct percentage per game: " + str(correctPercentage))
 
         file = open("weights.txt", "w")
         file.write("Input Weights: \n")
@@ -507,9 +511,8 @@ class AIPlayer(Player):
             for j in range(0, len(inputs)):
                 sum += weights[j][i] * inputs[j]
             sum += bias * biasWeights[i]
-            if math.isnan(sum):
+            if math.isnan(sum):  # make sure that the number is not a nan.  If so, then make 0
                 sum = 0.0
-
             g = 1/(1+math.exp(-1*sum))
             self.xInput[i] = g
             hiddenNodeValues.append(g)
@@ -549,10 +552,10 @@ class AIPlayer(Player):
     ##
     #
     #
-    def backPropogation(self, state):
+    def backPropogation(self, state, me):
         self.moves += 1
         # Get all the inputs and weight values
-        expectedVal = self.scoreState(state, state.whoseTurn)
+        expectedVal = self.scoreState(state, me)
         weights = self.inputWeights
         inputs = list(self.inputs.values())
         hiddenWeights = self.hiddenNodeWeights

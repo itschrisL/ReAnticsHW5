@@ -211,7 +211,8 @@ class AIPlayer(Player):
     #   me - reference to who's turn it is
     ##
     def startBestMoveSearch(self, state, me):
-        currScore = self.scoreState(state, me)  # Get current score of state
+        #currScore = self.scoreState(state, me)  # Get current score of state
+        currScore = self.scoreStateFromNet(state)
         moves = listAllLegalMoves(state)  #
         thisNode = {"move": None, "state": state, "score": None, "parentNode": None,
                      "alpha": -1000, "beta": 1000}  # Create node by creating dictionary
@@ -248,7 +249,7 @@ class AIPlayer(Player):
                     "alpha": alpha, "beta": beta}
         # If depth limit reach, then just return this node
         if depth == self.depthLimit:
-            thisNode["score"] = self.scoreState(state, me)
+            thisNode["score"] = self.scoreStateFromNet(state)
             return thisNode
         else:
             moves = listAllLegalMoves(state)  # Get all legal moves
@@ -263,7 +264,7 @@ class AIPlayer(Player):
             # If at depth limit, sort nodes from lowest to highest.
             # Increase efficiency in our alpha beta pruning
             if depth == self.depthLimit - 1:
-                stateScores = [self.scoreState(state, me) for state in nextStates]
+                stateScores = [self.scoreStateFromNet(state) for state in nextStates]
                 lowToHighIndices = sorted(range(len(stateScores)), key=lambda k: stateScores[k])
             else:
                 # If depth limit not reached then just go through every node
@@ -316,7 +317,12 @@ class AIPlayer(Player):
 
         biasWeightOnOutput = -0.9657786836202035
 
-        val = self.propagate()
+        temp = self.scoreState(state, state.whoseTurn)
+        inputList = list(self.inputs.values())
+        val = self.propagate(inputList, inputWieghts, hiddenNodeWieghts, biasWeights, biasWeightOnOutput)
+        #print("ours: " + str(val))
+        #print("expect: " + str(temp))
+        return val
 
     ##
     #scoreState
@@ -492,7 +498,7 @@ class AIPlayer(Player):
     ##
     #
     #
-    def propagate(self, inputs, weights, hiddenWeights, biasWeights):
+    def propagate(self, inputs, weights, hiddenWeights, biasWeights, finalBiasWeight):
         hiddenNodeValues = []
         bias = 1
         # Calculate value for hidden layer
@@ -511,7 +517,7 @@ class AIPlayer(Player):
         sum = 0.0
         for j in range(0, self.numOfHiddenNodes):
             sum += hiddenWeights[j] * hiddenNodeValues[j]
-        sum += bias * self.weightOnOutputBias
+        sum += bias * finalBiasWeight
         if math.isnan(sum):
             sum = 0.0
         self.finalNodeValue = sum
@@ -551,13 +557,14 @@ class AIPlayer(Player):
         inputs = list(self.inputs.values())
         hiddenWeights = self.hiddenNodeWeights
         biasWeights = self.biasWeights
-        actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
+        actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights, self.weightOnOutputBias)
         error = float(expectedVal-actualVal)
         if -0.03 < error < 0.03:
             self.correctCount += 1
         while -0.03 > error or error > 0.03:
             self.adjustWeights(self.inputWeights, error, inputs)
-            actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights)
+            actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights,
+                                       self.weightOnOutputBias)
             error = expectedVal - actualVal
         return actualVal
 

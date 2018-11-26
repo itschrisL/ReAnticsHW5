@@ -12,6 +12,7 @@ from GameState import *
 from AIPlayerUtils import *
 import numpy as np
 import math
+import random
 
 
 ##
@@ -49,12 +50,15 @@ class AIPlayer(Player):
     #   cpy           - whether the player is a copy (when playing itself)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer, self).__init__(inputPlayerId, "Mr. Net")  # TODO: What should our name be?
+        super(AIPlayer, self).__init__(inputPlayerId, "Mr. Net")
+        # Variables for project 4 (Min-Max)
         self.depthLimit = 3
         self.foods = []
         self.homes = []
         self.playerIndex = None
         self.enemyHomes = []
+
+        # Variables for Project 5
         self.inputs = {'foodCount': 0.0,
                        'myWorkerCount': 0.0,  # This includes num of workers, if they are carrying food, and distance
                        'numSoldersDistToQueen': 0.0,
@@ -64,17 +68,17 @@ class AIPlayer(Player):
         self.inputWeights = None  # Weights from the inputs to each hidden layer node
         self.hiddenNodeWeights = None  # Weights from the hidden layer to the output layer
         self.biasWeights = None
-        self.testMatrix = None
         self.bias = 1
         self.weightOnOutputBias = 0.0
-        self.alpha = 0.5
-        self.numOfHiddenNodes = 4
+        self.alpha = 0.7
+        self.numOfHiddenNodes = 6
         self.states = []
         self.xInput = []
         self.finalNodeValue = 0
         self.averageError = 0  # Average error for the first pass
         self.correctCount = 0
         self.moves = 0
+        self.prevStates = []
 
     ##
     # initWeights
@@ -118,6 +122,8 @@ class AIPlayer(Player):
     # Return: The coordinates of where the construction is to be placed
     ##
     def getPlacement(self, currentState):
+        self.moves = 0
+        self.correctCount = 0
         # If weights haven't been set, create it with random values
         if self.inputWeights is None:
             self.initWeights()
@@ -170,7 +176,7 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         # set global variable playerIndex
-        self.moves += 1  # add to move counter
+        # self.moves += 1  # add to move counter
         cpy_state = currentState.fastclone()
         self.playerIndex = cpy_state.whoseTurn
         self.foods = getConstrList(currentState, None, (FOOD,))
@@ -178,8 +184,8 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        temp = list(self.inputs.values())
         self.backPropogation(currentState)
+        self.prevStates.append(currentState)
         return move
 
     ##
@@ -287,6 +293,30 @@ class AIPlayer(Player):
                 thisNode["score"] = beta
                 thisNode["beta"] = beta
                 return thisNode
+
+    def scoreStateFromNet(self, state):
+        inputWieghts = [[-4.049110751128535, -2.9491082213518247, 0.6806065238560401, 0.5773638545322063,
+                         0.9063080451834983, 2.865641797356869],
+                        [-0.3864259956659805, -0.37032876419752375, -0.14394159749843088, 0.7477532690923326,
+                         -0.19935965848124151, 0.5573348346940795],
+                        [-4.662727034951296, -5.011860948665886, 0.49556593083172357, 0.0707317783013398,
+                         0.5562012107062175, 3.246180681377029],
+                        [-5.761076646738083, -3.8770757828720788, 0.6800425742572785, -0.4800177052305451,
+                         1.7207813364095417, 2.346207801181397],
+                        [-0.5691931202212036, -0.7493124708732851, -0.6799319349279332, 0.6583542435785669,
+                         0.14689671831648227, -0.0159533130967858],
+                        [-0.8836113944086057, -0.8024766580602715, 0.8871727252464776, -0.8102458217080186,
+                         -0.11622274490555982, 0.5725826289473327]]
+
+        hiddenNodeWieghts = [-3.1939257575811384, -2.629935916387678, 0.47054739998785783, 0.0014479968710898738,
+                             0.7442333989951628, 2.0246821143399782]
+
+        biasWeights = [-0.5741574426544654, -0.7568596504794267, -0.44704321913517825, -1.3886490770572109,
+                       -0.9651993802022091, -1.3847097571614273]
+
+        biasWeightOnOutput = -0.9657786836202035
+
+        val = self.propagate()
 
     ##
     #scoreState
@@ -401,9 +431,25 @@ class AIPlayer(Player):
     # This agent doens't learn
     #
     def registerWin(self, hasWon):
+        print(self.correctCount)
+        print(self.moves)
         correctPercentage = self.correctCount/self.moves
         print("Correct percentage per game: " + str(correctPercentage))
-        # method templaste, not implemented
+
+        random.shuffle(self.prevStates)
+        for state in self.prevStates:
+            self.backPropogation(state)
+
+        file = open("weights.txt", "w")
+        file.write("Input Weights: \n")
+        file.write(str(self.inputWeights))
+        file.write("\nHidden Node weights\n")
+        file.write(str(self.hiddenNodeWeights))
+        file.write("\nBias Weights\n")
+        file.write(str(self.biasWeights))
+        file.write("\nweight on output bias\n")
+        file.write(str(self.weightOnOutputBias))
+
         pass
 
     ##
@@ -498,13 +544,14 @@ class AIPlayer(Player):
     #
     #
     def backPropogation(self, state):
+        self.moves += 1
         # Get all the inputs and weight values
+        expectedVal = self.scoreState(state, state.whoseTurn)
         weights = self.inputWeights
         inputs = list(self.inputs.values())
         hiddenWeights = self.hiddenNodeWeights
         biasWeights = self.biasWeights
         actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights)
-        expectedVal = self.scoreState(state, state.whoseTurn)
         error = float(expectedVal-actualVal)
         if -0.03 < error < 0.03:
             self.correctCount += 1
@@ -512,28 +559,7 @@ class AIPlayer(Player):
             self.adjustWeights(self.inputWeights, error, inputs)
             actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights)
             error = expectedVal - actualVal
-        #file = open("weights.txt", "w")
-        #file.write(str(weights))
         return actualVal
-
-
-def test_propagate2(self):
-    bias = 1
-    biaswWightOnLastNode = 0.1
-    test = self.propagate2(self.getInputs(), self.getInputs(),
-                               self.getHiddenLayerWeights())
-    print(test)
-
-    if test == 3.49:
-        print("propagate works")
-    else:
-        print("propagate does not work")
-    pass
-
-def test_adjustWeightS(self):
-    pass
-
-
 
 
 import unittest

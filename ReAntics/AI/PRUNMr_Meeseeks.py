@@ -14,20 +14,10 @@ import numpy as np
 import math
 import random
 
-
-##
-# Name
-# Description:
-#
-# Parameters:
-#
-# Return:
-##
-
 ##
 # AI Homework 5
 # Authors: Chris Lytle and Reeca Bardon
-# Date: 10/8/18
+# Date: 11/26/18
 ##
 
 
@@ -67,26 +57,21 @@ class AIPlayer(Player):
                        'enWorkerCount': 0.0}
         self.inputWeights = None  # Weights from the inputs to each hidden layer node
         self.hiddenNodeWeights = None  # Weights from the hidden layer to the output layer
-        self.biasWeights = None
-        self.bias = 1
-        self.weightOnOutputBias = 0.0
-        self.alpha = 0.7
-        self.numOfHiddenNodes = 6
-        self.states = []
-        self.xInput = []
-        self.finalNodeValue = 0
-        self.averageError = 0  # Average error for the first pass
-        self.correctCount = 0
-        self.moves = 0
-        self.prevStates = []
+        self.biasWeights = None  # Weight on the bias' on the hidden layer
+        self.bias = 1  # Bias weight for entire net
+        self.weightOnOutputBias = 0.0  # Weight on the bias going to the node before the output
+        self.alpha = 0.7  # The learning Rate
+        self.numOfHiddenNodes = 6  # Number of hidden nodes in this case, We played around with this number a little
+        self.xInput = []  # Value of hidden nodes so we can adjust the weights later
+        self.finalNodeValue = 0  # Value of final node
+        self.correctCount = 0  # Number of correct predictions
+        self.moves = 0  # Number of moves or states that the network was trained on
+        self.prevStates = []  # List of states to train the agent on
 
     ##
     # initWeights
-    # Description:
-    #
-    # Parameters:
-    #
-    # Return:
+    # Description: Creates random values to initiate the values
+    # of the weights on the Neural Network
     ##
     def initWeights(self):
         self.inputWeights = []
@@ -122,7 +107,7 @@ class AIPlayer(Player):
     # Return: The coordinates of where the construction is to be placed
     ##
     def getPlacement(self, currentState):
-        self.moves = 0
+        self.moves = 0  # Reset moves and correct count numbers
         self.correctCount = 0
         # If weights haven't been set, create it with random values
         if self.inputWeights is None:
@@ -184,7 +169,6 @@ class AIPlayer(Player):
         self.enemyHomes = getConstrList(currentState, 1 - currentState.whoseTurn, (ANTHILL, TUNNEL,))
         # Find best move method that uses recursive calls
         move = self.startBestMoveSearch(cpy_state, cpy_state.whoseTurn)
-        # self.backPropogation(currentState)
         self.prevStates.append(currentState)
         print(str(move))
         return move
@@ -212,8 +196,8 @@ class AIPlayer(Player):
     #   me - reference to who's turn it is
     ##
     def startBestMoveSearch(self, state, me):
-        # currScore = self.scoreState(state, me)  # Get current score of state
-        currScore = self.scoreStateFromNet(state, me)
+        # Get current score of state
+        currScore = self.scoreStateFromNet(state, me)  # Using new method to get score
         moves = listAllLegalMoves(state)  #
         thisNode = {"move": None, "state": state, "score": None, "parentNode": None,
                      "alpha": -1000, "beta": 1000}  # Create node by creating dictionary
@@ -250,8 +234,7 @@ class AIPlayer(Player):
                     "alpha": alpha, "beta": beta}
         # If depth limit reach, then just return this node
         if depth == self.depthLimit:
-            # thisNode["score"] = self.scoreState(state, me)
-            thisNode["score"] = self.scoreStateFromNet(state, me)
+            thisNode["score"] = self.scoreStateFromNet(state, me)  # Using new method to get score
             return thisNode
         else:
             moves = listAllLegalMoves(state)  # Get all legal moves
@@ -266,7 +249,7 @@ class AIPlayer(Player):
             # If at depth limit, sort nodes from lowest to highest.
             # Increase efficiency in our alpha beta pruning
             if depth == self.depthLimit - 1:
-                # stateScores = [self.scoreState(state, me) for state in nextStates]
+                # Using new method to get score
                 stateScores = [self.scoreStateFromNet(state, me) for state in nextStates]
                 lowToHighIndices = sorted(range(len(stateScores)), key=lambda k: stateScores[k])
             else:
@@ -283,7 +266,6 @@ class AIPlayer(Player):
                         break
                 thisNode["score"] = alpha
                 thisNode["alpha"] = alpha
-
                 return thisNode
             # Min Evaluations
             else:
@@ -298,19 +280,31 @@ class AIPlayer(Player):
                 thisNode["beta"] = beta
                 return thisNode
 
+    ##
+    # ScoreStateFromNet
+    # Description: Gets the score of current state based on weights that were trained on.
+    #
+    # Parameters:
+    #   GameState state - Instance of the current state
+    #   Int me - Reference to this AI player's index in game state, needed to get inputs
+    #
+    # Return:
+    #   float val - the value of the current state based on propagate function and given weights
+    ##
     def scoreStateFromNet(self, state, me):
-        inputWieghts = [[-3.657254638284446, 0.5316707141038243, -3.37440586851363, 3.481189161618746,
-                         1.911812225361641, -0.7617141134979972],
-                        [-0.1419948628500165, 0.5408133459573163, 0.30732462218556644, 0.6282180369685747,
-                         -0.623221808237557, -0.40542541575131275],
-                        [-2.9039221700126734, 2.3214477309727974, -4.1229483511642515, 4.385355885614808,
-                         1.446467997275358, -0.6178269904201446],
-                        [-3.002540165264651, 0.8274066531995593, -4.120012418654349, 3.0265894891576015,
-                         2.591871112775095, -1.290227630952384],
-                        [-0.7081027248689823, 0.4358020709106849, -0.7160712298391342, -0.30748940964166055,
-                         0.6340418446947687, -0.11067959251406172],
-                        [0.2677833319025874, -0.4643719898011794, -0.9562896052878249, 0.7597785803211642,
-                         -0.1527834612583077, -0.36381517207034897]]
+        # Instance variables of the trained weights
+        inputWieghts = [[-3.657254638284446, 0.5316707141038243, -3.37440586851363,
+                         3.481189161618746, 1.911812225361641, -0.7617141134979972],
+                        [-0.1419948628500165, 0.5408133459573163, 0.30732462218556644,
+                         0.6282180369685747, -0.623221808237557, -0.40542541575131275],
+                        [-2.9039221700126734, 2.3214477309727974, -4.1229483511642515,
+                         4.385355885614808, 1.446467997275358, -0.6178269904201446],
+                        [-3.002540165264651, 0.8274066531995593, -4.120012418654349,
+                         3.0265894891576015, 2.591871112775095, -1.290227630952384],
+                        [-0.7081027248689823, 0.4358020709106849, -0.7160712298391342,
+                         -0.30748940964166055, 0.6340418446947687, -0.11067959251406172],
+                        [0.2677833319025874, -0.4643719898011794, -0.9562896052878249,
+                         0.7597785803211642, -0.1527834612583077, -0.36381517207034897]]
 
         hiddenNodeWieghts = [-1.9081998289314128, 0.9584860148444749, -2.849651219982444, 2.2680280743882144,
                              1.188555169512328, -0.6569314486414466]
@@ -318,22 +312,24 @@ class AIPlayer(Player):
         biasWeights = [-1.1252804099405211, -0.8905612507341796, -0.3507730897105387, -1.908624837158301,
                        -1.4219125700687236, -1.1401836142819237]
 
-
         biasWeightOnOutput = -0.982014739415461
 
-        temp = self.scoreState(state, me)
-        inputList = list(self.inputs.values())
+        # Call ScoreState,  This is only to update the inputs to the state not to get the value.
+        self.scoreState(state, me)
+
+        inputList = list(self.inputs.values())  # make inputs into a list
+        # Call propagate with the trained wights to get the value of the state
         val = self.propagate(inputList, inputWieghts, hiddenNodeWieghts, biasWeights, biasWeightOnOutput)
-        # print("ours: " + str(val))
-        # print("expect: " + str(temp))
         return val
 
     ##
-    #scoreState
-    #Description: scores the advantage of the current state form 1.0 to -1.0,
-    #higher numbers advantaging the 'me' player
+    # scoreState
+    # Description: scores the advantage of the current state form 1.0 to -1.0,
+    # higher numbers advantaging the 'me' player
     #
-    #Parameters:
+    # Old way to get the score of the current state
+    #
+    # Parameters:
     #   gameState - gameState to analyze
     ##
     def scoreState(self, gameState, me):
@@ -346,7 +342,6 @@ class AIPlayer(Player):
         enemyQueen = enemyInv.getQueen()
         playerFoodGross = myInv.foodCount
         foodScore = playerFoodGross / 11.0
-        self.inputs['foodCount'] = foodScore
 
         # tests for final win/lose states
         if myQueen is None:
@@ -357,7 +352,6 @@ class AIPlayer(Player):
         # TODO: Maybe delete this because enemyQueen health should never be greater then 10
         if enemyQueen.health > 10:
             antScore = antScore + (1 / enemyQueen.health)
-            self.inputs['enQueenHealth'] = antScore  # Update input list
 
         if foodScore == 1.0:
             return 1
@@ -365,12 +359,10 @@ class AIPlayer(Player):
         # checks health of enemy queen
         if enemyQueen is not None:
             healthScore = 1.0 - enemyQueen.health / 10.0
-            self.inputs['enQueenHealth'] = healthScore
         else:
             return 1.0
         # health of capture anthill
         capturehealthScore = 1.0 - self.enemyHomes[0].captureHealth / 3.0
-        self.inputs['enAnthillHealth'] = capturehealthScore
         if capturehealthScore == 1.0:
             return capturehealthScore
 
@@ -397,7 +389,6 @@ class AIPlayer(Player):
                 minSteps = min(stepsToFoods)
                 # antScore = antScore + .01 / (1.0 + minSteps)
                 myWorkerCount += .01 / (1.0 + minSteps)
-        self.inputs['myWorkerCount'] = myWorkerCount
 
         soldersToQueen = 0.0
         enWorkerCount = 0.0
@@ -416,11 +407,11 @@ class AIPlayer(Player):
             elif len(enemyWorkers) <= 0:
                 enWorkerCount = enWorkerCount + .1
                 # antScore = antScore + .1
-                self.inputs['enWorkerCount'] = .1
                 stepsToEnemyQueen = approxDist((x, y), enemyQueen.coords)
                 if stepsToEnemyQueen > 2:
                     soldersToQueen = soldersToQueen + .2 / (1.0 + stepsToEnemyQueen)
 
+        # Update the inputs to the network.
         self.inputs['foodCount'] = foodScore / 4
         self.inputs['myWorkerCount'] = myWorkerCount / 4
         self.inputs['numSoldersDistToQueen'] = soldersToQueen / 4
@@ -428,11 +419,6 @@ class AIPlayer(Player):
         self.inputs['enAnthillHealth'] = capturehealthScore / 4
         self.inputs['enWorkerCount'] = enWorkerCount / 4
         sumScore = foodScore + healthScore + capturehealthScore + myWorkerCount + soldersToQueen + enWorkerCount
-
-        if (sumScore / 4) > 1:
-            print("=============Score over 1==================")
-            print("input sum = " + str(imputSum))
-            print("expected value = " + str(sumScore))
         return sumScore / 4.0
 
     ##
@@ -441,15 +427,19 @@ class AIPlayer(Player):
     # This agent doens't learn
     #
     def registerWin(self, hasWon):
+
+        # Shuffle the states to train the network on random data.
         random.shuffle(self.prevStates)
+        # Call backPropogation on the shuffled list to train the weights on the network
         for state in self.prevStates:
             self.backPropogation(state, self.playerIndex)
 
-        print(self.correctCount)
-        print(self.moves)
+        # Used to see the percentage of correct predictions made when training
+        # If this value got over about 80% then we can say that the network is trained
         correctPercentage = self.correctCount / self.moves
-        print("Correct percentage per game: " + str(correctPercentage))
 
+        # Prints the current weights to a file so that they can be copied later and
+        # hardcoded into the program to ge the results.
         file = open("weights.txt", "w")
         file.write("Input Weights: \n")
         file.write(str(self.inputWeights))
@@ -459,7 +449,6 @@ class AIPlayer(Player):
         file.write(str(self.biasWeights))
         file.write("\nweight on output bias\n")
         file.write(str(self.weightOnOutputBias))
-
         pass
 
     ##
@@ -500,8 +489,19 @@ class AIPlayer(Player):
         return nextState
 
     ##
+    # Propagate
+    # Description: Calculates the output of the network given all the weights.
     #
+    # Parameters:
+    #   [float] inputs - list of inputs
+    #   [[float]] weights - weights on the edges from the inputs to the hidden nodes
+    #   [float] hiddenWeights - weights from the hidden nodes to the output node
+    #   [float] biasWeights - weights on bias' on each hidden node
+    #   float finalBiasWeight - weight on the bias on the final node
     #
+    # Return:
+    #   float g - the final value of the network given all the weights and inputs
+    ##
     def propagate(self, inputs, weights, hiddenWeights, biasWeights, finalBiasWeight):
         hiddenNodeValues = []
         bias = 1
@@ -517,8 +517,9 @@ class AIPlayer(Player):
             self.xInput[i] = g
             hiddenNodeValues.append(g)
 
+        # Calculate the value on the final node
         sum = 0.0
-        for j in range(0, self.numOfHiddenNodes):
+        for j in range(0, len(weights[0])):
             sum += hiddenWeights[j] * hiddenNodeValues[j]
         sum += bias * finalBiasWeight
         if math.isnan(sum):
@@ -527,43 +528,66 @@ class AIPlayer(Player):
         g = 1 / (1 + math.exp(-1 * sum))
         return g
 
+    ##
+    # adjustWeights
+    # Description: This function adjust the weights when needed so that the weights
+    # cna produce a more accurate outcome.
     #
-    #
-    #
+    # Parameters:
+    #   [[float]] weights - the weights on the inputs to the hidden layer
+    #   float error - the difference between the expected value and last calculated value
+    #   [float] inputs - list of input values used on last calculation
+    ##
     def adjustWeights(self, weights, error, inputs):
         deltas = []
-
+        # Calculate delta
         for n in range(0, len(self.hiddenNodeWeights)):
             deltas.append(error*self.hiddenNodeWeights[n])
 
-        # Adjust input weights
+        # Adjust weights on input node to output node
         for r in range(0, len(weights)):
             for c in range(0, len(weights[0])):
                 self.inputWeights[r][c] = weights[r][c] + (self.alpha * deltas[c] * inputs[r])
-
+        # Adjust weights on bias' on the hidden nodes
         for n in range(0, self.numOfHiddenNodes):
             self.biasWeights[n] = self.biasWeights[n] + (self.alpha * deltas[n] * self.bias)
-
+        # Adjust weights on hidden nodes to output node
         for n in range(0, self.numOfHiddenNodes):
             self.hiddenNodeWeights[n] = self.hiddenNodeWeights[n] + (self.alpha * error * self.xInput[n])
-
+        # Adjust weights on the output bias
         self.weightOnOutputBias = self.weightOnOutputBias + (self.alpha * error * self.bias)
 
     ##
+    # backPropogation
+    # Description: This function calculates the outcome of the neural network based on the inputs and weights.  This
+    # method also calls adjustWeights to correct the weights in the network.  The method adjust the weights until the
+    # network in within a certain error range.  Then returns the value of the propagation.
     #
+    # Parameters:
+    #   GameState state - the current state to be evaluated
+    #   int me - index of this player in the GameState
     #
+    # Return:
+    #   float actualVal - the value calculated thought the network
+    ##
     def backPropogation(self, state, me):
-        self.moves += 1
-        # Get all the inputs and weight values
+        self.moves += 1  # Increase the move counter
+        # Get the expected value of the network on the state and update the inputs.
         expectedVal = self.scoreState(state, me)
+        # Get weights and create instance variables
         weights = self.inputWeights
         inputs = list(self.inputs.values())
         hiddenWeights = self.hiddenNodeWeights
         biasWeights = self.biasWeights
-        actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights, self.weightOnOutputBias)
+        weightOnOutputBias = self.weightOnOutputBias
+        # Call propagate to find the calculated value on the network
+        actualVal = self.propagate(inputs, weights, hiddenWeights, biasWeights, weightOnOutputBias)
+        # find the error value or difference between correct and calculated values
         error = float(expectedVal-actualVal)
+        # If error value between -0.03 and 0.03 then the weights are correct
         if -0.03 < error < 0.03:
-            self.correctCount += 1
+            self.correctCount += 1  # Increase correct counter
+        # Train the weights until the values are within the error margin
         while -0.03 > error or error > 0.03:
             self.adjustWeights(self.inputWeights, error, inputs)
             actualVal = self.propagate(inputs, self.inputWeights, self.hiddenNodeWeights, self.biasWeights,
@@ -571,7 +595,8 @@ class AIPlayer(Player):
             error = expectedVal - actualVal
         return actualVal
 
-
+# Unit tests used to test different methods used in the program.  They are not proper unit tests, but print a value
+# to a network that we know the answer to.
 import unittest
 class testMethods(unittest.TestCase):
 
@@ -597,17 +622,14 @@ class testMethods(unittest.TestCase):
 
         return list
 
-    def test_propagate2(self):
+    def test_propagate(self):
         gameState = GameState.getBasicState()
         gameState.inventories[0].foodCount = 11
         AI = AIPlayer(PLAYER_ONE)
-        bias = 1
-        biaswWightOnLastNode = 0.1
         AI.xInput = [0, 0, 0, 0, 0, 0]
-        test = AIPlayer.propagate(AI, self.getInputs(), self.getInputWeights(),
-                                   self.getHiddenLayerWeights(), self.getBiasOnHiddenLayer())
-        AIPlayer.adjustWeights(AI, self.getInputWeights(), .5)
-        print(test)
+        val = AIPlayer.propagate(AI, self.getInputs(), self.getInputWeights(),
+                                   self.getHiddenLayerWeights(), self.getBiasOnHiddenLayer(), 0.3)
+        print(val)
         pass
 
 if __name__ == '__name__':
